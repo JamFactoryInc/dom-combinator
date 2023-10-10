@@ -3,6 +3,7 @@ type PrivateVElement<T> = VElement<any & T>
 type MethodsOf<T> = { [K in keyof T]: T[K] }
 
 type HTMLElementTypeMap = {
+    // text
     p: HTMLParagraphElement,
     h1: HTMLHeadingElement,
     h2: HTMLHeadingElement,
@@ -10,19 +11,61 @@ type HTMLElementTypeMap = {
     h4: HTMLHeadingElement,
     h5: HTMLHeadingElement,
     h6: HTMLHeadingElement,
-    span: HTMLSpanElement,
+    pre: HTMLPreElement,
+    li: HTMLLIElement,
+    //layout
     ul: HTMLUListElement,
     ol: HTMLOListElement,
+    br: HTMLBRElement,
+    // structure
+    title: HTMLTitleElement,
+    html: HTMLHtmlElement,
+    head: HTMLHeadElement,
+    style: HTMLStyleElement,
+    div: HTMLDivElement,
+    body: HTMLBodyElement,
+    section: HTMLElement
+    nav: HTMLElement,
+    footer: HTMLElement,
+    header: HTMLElement,
+    article: HTMLElement,
+    // input
+    button: HTMLButtonElement,
+    input: HTMLInputElement,
+    textarea: HTMLTextAreaElement,
+    label: HTMLLabelElement,
+    option: HTMLOptionElement,
+    select: HTMLSelectElement,
+    form: HTMLFormElement,
+    datalist: HTMLDataListElement,
+    optgrout: HTMLOptGroupElement,
+    // formatting
+    i: HTMLElement,
+    em: HTMLElement,
+    b: HTMLElement,
+    kbd: HTMLElement,
+    s: HTMLElement,
+    span: HTMLSpanElement,
+    strong: HTMLSpanElement,
+    sub: HTMLElement,
+    sup: HTMLElement,
+    u: HTMLElement,
+    // media
+    img: HTMLImageElement,
+    svg: SVGElement,
+    script: HTMLScriptElement,
 }
 
 type VElementSpecialMethods = {
     ul: MethodsOf<ReturnType<typeof ListElementImpl>>,
+    ol: MethodsOf<ReturnType<typeof ListElementImpl>>,
 }
 function ListElementImpl(self: VElement<any>) {
     return {
         add: <const ElementType extends keyof HTMLElementTypeMap>(type: ElementType, content: string = ""): VElement<ElementType> => {
             let newChild: VElement<ElementType> = Virt.create(type, content);
             self.children[type]?.push(newChild);
+            self.element.appendChild(newChild.element)
             return newChild;
         }
     }
@@ -52,12 +95,11 @@ type VElementAttrs<T extends string & keyof HTMLElementTypeMap> = {
 }
 
 type VElementMethodBaseReq<T extends string & keyof HTMLElementTypeMap> = {
-    [K in keyof VElementSpecialMethods[T & keyof VElementSpecialMethods]]: 
+    [K in keyof VElementSpecialMethods[T & keyof VElementSpecialMethods]]:
         VElementSpecialMethods[T & keyof VElementSpecialMethods][K]
-    
 }
 type VElementMethodBaseOpt<T extends string & keyof HTMLElementTypeMap> = {
-    [K in keyof VElementSpecialMethods[T & keyof VElementSpecialMethods]]?: 
+    [K in keyof VElementSpecialMethods[T & keyof VElementSpecialMethods]]?:
         VElementSpecialMethods[T & keyof VElementSpecialMethods][K]
 }
 
@@ -72,7 +114,15 @@ type VElement<T extends string & keyof HTMLElementTypeMap, TempMethods = false> 
 namespace Virt {
     function implSpecial<const T extends keyof HTMLElementTypeMap>(self: VElement<T>, createdElementType: T): VElementSpecialMethods[T extends keyof VElementSpecialMethods ? T : never] {
         switch (createdElementType) {
-            case "ul": return ListElementImpl(self)
+            case "ul": case "ol": return ListElementImpl(self)
+            default:
+                return {} as VElementSpecialMethods[never]
+        }
+    }
+
+    function implSpecialRuntime(self: VElement<any>, createdElementType: keyof HTMLElementTypeMap): any {
+        switch (createdElementType) {
+            case "ul": case "ol": return ListElementImpl(self)
             default:
                 return {} as VElementSpecialMethods[never]
         }
@@ -88,14 +138,38 @@ namespace Virt {
         vElement.element.textContent = content;
         return {...vElement, ...implSpecial(vElement, type)} as unknown as VElement<T>;
     }
+
+    function fromUnknown(element: HTMLElement): VElement<any> {
+        let newElement = {
+            type: element.tagName,
+            element: element,
+            children: {},
+            events: {},
+        } as VElement<any>
+        for (let i = 0; i < element.children.length; i++) {
+            element.children.item(i)
+        }
+        return { ...newElement, ...implSpecialRuntime(newElement, element.tagName as keyof HTMLElementTypeMap) }
+    }
 }
 
-interface ElementSpawner {
-
+function getElementsOfType<const T extends keyof HTMLElementTypeMap>(type: T): HTMLCollectionOf<HTMLElementTypeMap[T]> {
+    return document.getElementsByTagName(type) as HTMLCollectionOf<HTMLElementTypeMap[T]>
 }
 
-let x1 = Virt.create("ul")
-let b1 = x1.add("h1")
+
+
+
+
+let ulElement = Virt.create("ul", "ul!")
+ulElement.add("h1", "h1!")
+
+getElementsOfType("body").item(0)?.appendChild(ulElement.element)
+
+console.log(getElementsOfType("body").item(0))
+
+let olElement = Virt.create("ol")
+olElement.add("h1")
 
 let x2 = Virt.create("p")
 console.log("wow")

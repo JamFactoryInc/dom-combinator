@@ -1,4 +1,7 @@
 
+type PrivateVElement<T> = VElement<any & T>
+type MethodsOf<T> = { [K in keyof T]: T[K] }
+
 type HTMLElementTypeMap = {
     p: HTMLParagraphElement,
     h1: HTMLHeadingElement,
@@ -9,7 +12,21 @@ type HTMLElementTypeMap = {
     h6: HTMLHeadingElement,
     span: HTMLSpanElement,
     ul: HTMLUListElement,
+    ol: HTMLOListElement,
 }
+
+type VElementSpecialMethods = {
+    ul: MethodsOf<ReturnType<typeof ListElementImpl>>,
+}
+function ListElementImpl(self: VElement<any>) {
+    return {
+        add: <const ElementType extends keyof HTMLElementTypeMap>(type: ElementType, content: string = ""): VElement<ElementType> => {
+            let newChild: VElement<ElementType> = Virt.create(type, content);
+            self.children[type]?.push(newChild);
+            return newChild;
+        }
+    }
+};
 
 type DomEventTypeMap = {
     onClick: PointerEvent,
@@ -20,30 +37,42 @@ type DomEvent =
     | { type: "mouseEnter", event: MouseEvent }
 
 type VElementChildren = {
-    [key in keyof HTMLElementTypeMap]?: VElement.VElement<key>
+    [key in keyof HTMLElementTypeMap]?: VElement<key>[]
 }
 
 type VElementEventCallbacks = {
     [key in keyof DomEventTypeMap]?: (event: DomEventTypeMap[key]) => void
 }
 
-type VElementSpecialMethods = {
-    ul: { add: typeof VElement.create }
+type VElementAttrs<T extends string & keyof HTMLElementTypeMap> = {
+    type: keyof HTMLElementTypeMap,
+    element: HTMLElementTypeMap[T],
+    children: VElementChildren,
+    events: VElementEventCallbacks,
 }
 
-namespace VElement {
-    export declare interface VElement<T extends string & keyof HTMLElementTypeMap> {
-        type: keyof HTMLElementTypeMap,
-        element: HTMLElementTypeMap[T],
-        children: VElementChildren,
-        events: VElementEventCallbacks,
-        methods: VElementSpecialMethods[T extends keyof VElementSpecialMethods ? T : never]
-    }
+type VElementMethodBaseReq<T extends string & keyof HTMLElementTypeMap> = {
+    [K in keyof VElementSpecialMethods[T & keyof VElementSpecialMethods]]: 
+        VElementSpecialMethods[T & keyof VElementSpecialMethods][K]
+    
+}
+type VElementMethodBaseOpt<T extends string & keyof HTMLElementTypeMap> = {
+    [K in keyof VElementSpecialMethods[T & keyof VElementSpecialMethods]]?: 
+        VElementSpecialMethods[T & keyof VElementSpecialMethods][K]
+}
 
-    function implSpecial<const T extends keyof HTMLElementTypeMap>(type: T): VElementSpecialMethods[T extends keyof VElementSpecialMethods ? T : never] {
-        switch (type) {
-            case "ul":
-                return { add: create } as VElementSpecialMethods["ul"]
+type VElementBase<T extends string & keyof HTMLElementTypeMap> = {
+    [K in keyof VElementAttrs<T>]: VElementAttrs<T>[K]
+}
+
+type VElement<T extends string & keyof HTMLElementTypeMap, TempMethods = false> =
+    (TempMethods extends true ? VElementMethodBaseOpt<T> : VElementMethodBaseReq<T>)
+        & VElementBase<T>
+
+namespace Virt {
+    function implSpecial<const T extends keyof HTMLElementTypeMap>(self: VElement<T>, createdElementType: T): VElementSpecialMethods[T extends keyof VElementSpecialMethods ? T : never] {
+        switch (createdElementType) {
+            case "ul": return ListElementImpl(self)
             default:
                 return {} as VElementSpecialMethods[never]
         }
@@ -55,17 +84,18 @@ namespace VElement {
             element: document.createElement(type) as HTMLElementTypeMap[T extends keyof HTMLElementTypeMap ? T : never],
             children: {},
             events: {},
-            methods: implSpecial(type)
-        }
+        } as VElement<T>
         vElement.element.textContent = content;
-        return vElement;
+        return {...vElement, ...implSpecial(vElement, type)} as unknown as VElement<T>;
     }
 }
-
 
 interface ElementSpawner {
 
 }
 
-let x = VElement.create("ul")
-let b = x.methods.add("h1")
+let x1 = Virt.create("ul")
+let b1 = x1.add("h1")
+
+let x2 = Virt.create("p")
+console.log("wow")

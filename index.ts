@@ -71,6 +71,23 @@ function ListElementImpl(self: VElement<any>) {
     }
 };
 
+type PatternMapper<ReturnType> = {
+    [key in keyof HTMLElementTypeMap]?: (element: VElement<key & keyof Partial<HTMLElementTypeMap>>) => ReturnType
+} & {
+    "_": (element: VElement<any>) => ReturnType
+}
+
+function BaseElementImpl(self: any) {
+    return {
+        map: <T>(callbacks: PatternMapper<T>) => {
+            let callback = callbacks[(<VElement<any>>self).type]
+            callback
+                ? callback(self as any)
+                : callbacks._(self)
+        }
+    }
+}
+
 type DomEventTypeMap = {
     onClick: PointerEvent,
     mouseEnter: MouseEvent
@@ -109,7 +126,8 @@ type VElementBase<T extends string & keyof HTMLElementTypeMap> = {
 
 type VElement<T extends string & keyof HTMLElementTypeMap, TempMethods = false> =
     (TempMethods extends true ? VElementMethodBaseOpt<T> : VElementMethodBaseReq<T>)
-        & VElementBase<T>
+    & VElementBase<T>
+    & ReturnType<typeof BaseElementImpl>
 
 namespace Virt {
     function implSpecial<const T extends keyof HTMLElementTypeMap>(self: VElement<T>, createdElementType: T): VElementSpecialMethods[T extends keyof VElementSpecialMethods ? T : never] {
@@ -136,10 +154,11 @@ namespace Virt {
             events: {},
         } as VElement<T>
         vElement.element.textContent = content;
-        return {...vElement, ...implSpecial(vElement, type)} as unknown as VElement<T>;
+        return { ...vElement, ...implSpecial(vElement, type)} as unknown as VElement<T>;
     }
 
-    function fromUnknown(element: HTMLElement): VElement<any> {
+    export function fromUnknown(element: HTMLElement | null): VElement<any> | null {
+        if (!element) return null;
         let newElement = {
             type: element.tagName,
             element: element,
@@ -157,14 +176,29 @@ function getElementsOfType<const T extends keyof HTMLElementTypeMap>(type: T): H
     return document.getElementsByTagName(type) as HTMLCollectionOf<HTMLElementTypeMap[T]>
 }
 
-
-
-
+type Keys = keyof HTMLElementTypeMap
+type Test = <T>([...Keys], _: (arg: VElement<any>) => T) => T
+let x: Keys = "article"
 
 let ulElement = Virt.create("ul", "ul!")
 ulElement.add("h1", "h1!")
 
+function test0
+
+function test1<Params extends { } >(...params: Parameters<Params>) {
+    const _params: Parameters<{ }> = params;
+    return 1
+}
+
 getElementsOfType("body").item(0)?.appendChild(ulElement.element)
+
+let unknownElement = Virt.fromUnknown(document.getElementById("test-element"))
+
+
+unknownElement?.map({
+    h1: (_) => {  },
+    _: (_) => { }
+})
 
 console.log(getElementsOfType("body").item(0))
 

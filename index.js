@@ -12,9 +12,29 @@ function ListElementImpl(self) {
     };
 }
 ;
+function BaseElementImpl(self) {
+    let mapFn = () => (callbacks) => {
+        let callback = callbacks[self.type];
+        callback
+            ? callback(self)
+            : callbacks._(self);
+    };
+    return {
+        as: (mapFn),
+        map: mapFn()
+    };
+}
 var Virt;
 (function (Virt) {
     function implSpecial(self, createdElementType) {
+        switch (createdElementType) {
+            case "ul":
+            case "ol": return ListElementImpl(self);
+            default:
+                return {};
+        }
+    }
+    function implSpecialRuntime(self, createdElementType) {
         switch (createdElementType) {
             case "ul":
             case "ol": return ListElementImpl(self);
@@ -33,6 +53,18 @@ var Virt;
         return Object.assign(Object.assign({}, vElement), implSpecial(vElement, type));
     }
     Virt.create = create;
+    function fromUnknown(element) {
+        let newElement = {
+            type: element.tagName,
+            element: element,
+            children: {},
+            events: {},
+        };
+        for (let i = 0; i < element.children.length; i++) {
+            element.children.item(i);
+        }
+        return Object.assign(Object.assign({}, newElement), implSpecialRuntime(newElement, element.tagName));
+    }
 })(Virt || (Virt = {}));
 function getElementsOfType(type) {
     return document.getElementsByTagName(type);
